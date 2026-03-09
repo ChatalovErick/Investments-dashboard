@@ -7,3 +7,7 @@ __pycache__/
 # Ignore personal data (optional)
 app/data/*.csv
 
+# Ignore python files
+app/app_tests.py
+
+app/pages/Portfolio_tests.py
