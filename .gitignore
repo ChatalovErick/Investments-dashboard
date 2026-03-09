@@ -5,4 +5,5 @@ myenv/
 __pycache__/
 
 # Ignore personal data (optional)
-*.csv
+app/data/*.csv
+
