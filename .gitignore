@@ -1,5 +1,6 @@
 # Ignore virtual environment
 myenv/
+.myenv/
 
 # Ignore Python cache
 __pycache__/
@@ -10,4 +11,6 @@ app/data/*.csv
 # Ignore python files
 app/app_tests.py
 
-app/pages/Portfolio_tests.py
+app/pages/Portfolio_test.py
+app/pages/Portfolio_dev.py
+app/pages/graph_tests.py
