@@ -7,8 +7,10 @@ import plotly.express as px
 from streamlit_plotly_events import plotly_events
 
 # 1. Page Configuration
-st.set_page_config(page_title="Investment Drill-Down", layout="wide")
-st.title("Interactive Portfolio Dashboard 📊")
+st.set_page_config(page_title="My Portfolio", layout="wide")
+
+with st.container(border=True):
+    st.title("My Portfolio")
 
 ## ---------------------------------------------------------------- ##
 ##                Load the investments data                         ##
@@ -55,7 +57,7 @@ with st.container(border=True):
     with graph_col1:
         with st.container(border=True):
             if st.session_state.current_selection is None:
-                st.subheader("Allocation by Type (Bar)")
+                st.subheader("By Asset Class")
                 df_type = df.groupby('asset_type')['total_value'].sum().reset_index()
 
                 fig1 = px.bar(
@@ -81,7 +83,7 @@ with st.container(border=True):
     with graph_col2:
         with st.container(border=True):
             if st.session_state.current_selection is None:
-                st.subheader("Allocation by Type (Pie)")
+                st.subheader("Allocation")
                 df_type_pie = df.groupby('asset_type')['total_value'].sum().reset_index()
 
                 fig_pie = px.pie(
@@ -136,7 +138,7 @@ with st.container(border=True):
     # --- Action Buttons ---
     with st.container(border=True):
 
-        st.subheader(f"Asset Management")
+        st.subheader(f"Manage Holdings")
 
         btn_col1, btn_col2, btn_spacer = st.columns([1, 1, 4])
         
@@ -208,7 +210,7 @@ with st.container(border=True):
 ## ---------------------------------------------------------------- ##
 
 with st.container(border=True):
-    st.subheader(f"Filter & View Controls")
+    st.subheader(f"Filter Your View")
     asset_types = ["All"] + sorted(df["asset_type"].unique().tolist())
     filter_val = st.selectbox("Filter for the graphs and table", asset_types)
 
@@ -226,7 +228,7 @@ with st.container(border=True):
 
     with col:
         with st.container(border=True):
-            st.subheader("Allocation by Individual Asset")
+            st.subheader(f"Allocation by Individual Asset: {filter_val}")
             
             # CHANGE: Use filtered_df here instead of df
             df_assets = filtered_df.groupby('asset')['total_value'].sum().reset_index()

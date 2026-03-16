@@ -9,7 +9,8 @@ __pycache__/
 app/data/*.csv
 
 # Ignore python files
-app/app_tests.py
+app/app_test.py
+app/app_dev.py
 
 app/pages/Portfolio_test.py
 app/pages/Portfolio_dev.py
