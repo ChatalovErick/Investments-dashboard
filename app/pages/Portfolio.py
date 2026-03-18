@@ -13,6 +13,62 @@ st.set_page_config(page_title="My Portfolio", layout="wide")
 with st.container(border=True):
     st.title("My Portfolio")
 
+HISTORY_FILE = "data/portfolio_history.csv"
+
+## ---------------------------------------------------------------- ##
+##                History Management Functions                      ##
+## ---------------------------------------------------------------- ##
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        hist = pd.read_csv(HISTORY_FILE, parse_dates=["date"])
+
+        # Auto-migrate missing columns
+        if "invested_portfolio_balance" not in hist.columns:
+            hist["invested_portfolio_balance"] = None
+
+        # Clean corrupted rows
+        hist['current_portfolio_balance'] = pd.to_numeric(
+            hist['current_portfolio_balance'], errors='coerce'
+        )
+        hist['invested_portfolio_balance'] = pd.to_numeric(
+            hist['invested_portfolio_balance'], errors='coerce'
+        )
+
+        # Forward-fill and replace remaining NaN
+        hist['current_portfolio_balance'] = hist['current_portfolio_balance'].ffill().fillna(0)
+        hist['invested_portfolio_balance'] = hist['invested_portfolio_balance'].ffill().fillna(0)
+
+        return hist
+
+    return pd.DataFrame(columns=["date", "current_portfolio_balance", "invested_portfolio_balance"])
+
+def save_history_entry(current_df):
+    """Recalculates current and invested totals and updates portfolio_history.csv"""
+    hist = load_history()
+    today = pd.to_datetime(date.today())
+    
+    # Calculate Invested (Cost Basis)
+    invested_total = (current_df['price'] * current_df['quantity']).sum()
+    
+    # Calculate Current (Market Value)
+    # Uses 'current_price' if fetched, otherwise falls back to purchase 'price'
+    if 'current_price' in current_df.columns:
+        current_total = (current_df['current_price'] * current_df['quantity']).sum()
+    else:
+        current_total = invested_total
+
+    new_entry = pd.DataFrame([{
+        "date": today,
+        "current_portfolio_balance": round(current_total, 3),
+        "invested_portfolio_balance": round(invested_total, 1)
+    }])
+
+    # Remove existing entry for today to avoid duplicates, then append
+    hist = hist[hist['date'] != today]
+    hist = pd.concat([hist, new_entry], ignore_index=True).sort_values("date")
+    hist.to_csv(HISTORY_FILE, index=False)
+
 ## ---------------------------------------------------------------- ##
 ##                Load the investments data                         ##
 ## ---------------------------------------------------------------- ##
@@ -24,9 +80,18 @@ def load_data():
     try:
         data = pd.read_csv("data/investments.csv")
         data['price'] = pd.to_numeric(data['price'], errors='coerce').fillna(0)
-        data['quantity'] = pd.to_numeric(data['quantity'], errors='coerce').fillna(0)
+        data['quantity'] = pd.to_numeric(data['quantity'], errors='coerce').fillna(0) 
         data['total_value'] = data['price'] * data['quantity']
+
+        ## Get the current price for some assets ##
+        data.insert(
+            5,  # position index
+            "current_price",
+            data.apply(lambda row: get_current_price(row["asset_type"], row["ticker"]), axis=1)
+        )
+
         return data
+    
     except (FileNotFoundError, pd.errors.EmptyDataError):
         return pd.DataFrame(columns=[
             "date", "asset", "ticker", "asset_type",
@@ -39,14 +104,6 @@ df = load_data()
 if df.empty:
     st.warning("The dataset is empty. Please add some investments to see the charts.")
     st.stop()
-
-## Get the current price for some assets ##
-
-df.insert(
-    5,  # position index
-    "current_price",
-    df.apply(lambda row: get_current_price(row["asset_type"], row["ticker"]), axis=1)
-)
 
 ## ---------------------------------------------------------------- ##
 ##                Investment Drill-Down Logic                       ##
@@ -66,7 +123,7 @@ with st.container(border=True):
     with graph_col1:
         with st.container(border=True):
             if st.session_state.current_selection is None:
-                st.subheader("By Asset Class")
+                st.subheader("Asset Balance")
                 df_type = df.groupby('asset_type')['total_value'].sum().reset_index()
 
                 fig1 = px.bar(
@@ -178,16 +235,49 @@ with st.container(border=True):
                 submitted = st.form_submit_button("Add Entry")
 
             if submitted:
-
-                total_value = price * quantity
-
+                # 1. Prepare the new row for investments.csv
                 new_row = {"date": entry_date, "asset": asset, "ticker": ticker, "asset_type": asset_type, 
-                        "price": price, "quantity": quantity, "fees": fees, "currency": currency, 
-                        "goal": goal, "notes": notes, "total_value": total_value}
-                        
+                           "price": price, "quantity": quantity, "fees": fees, "currency": currency, 
+                           "goal": goal, "notes": notes}
+                
+                # Append to current dataframe
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                df.to_csv("data/investments.csv", index=False)
-                st.success("Entry added!")
+                
+                # Save investments.csv (cleaned)
+                cols_to_drop = ["total_value", "current_price", "label"]
+                save_df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
+                save_df.to_csv("data/investments.csv", index=False)
+
+                ## --- NEW: Update portfolio_history.csv --- ##
+                
+                # Calculate the totals for the history file
+                # Invested = sum of (purchase price * quantity)
+                invested_total = (df['price'] * df['quantity']).sum()
+                
+                # Current = sum of (live price * quantity)
+                current_total = (df['current_price'] * df['quantity']).sum()
+
+                history_file = "data/portfolio_history.csv"
+                today_str = date.today().strftime("%Y-%m-%d")
+
+                new_history_entry = pd.DataFrame([{
+                    "date": today_str,
+                    "current_portfolio_balance": round(current_total, 3),
+                    "invested_portfolio_balance": round(invested_total, 1)
+                }])
+
+                if os.path.exists(history_file):
+                    history_df = pd.read_csv(history_file)
+                    # If an entry for today already exists, update it; otherwise, append
+                    history_df = history_df[history_df['date'] != today_str]
+                    history_df = pd.concat([history_df, new_history_entry], ignore_index=True)
+                else:
+                    history_df = new_history_entry
+
+                history_df.to_csv(history_file, index=False)
+                ## ----------------------------------------- ##
+
+                st.success("Investment added and history updated!")
                 st.session_state.show_add_form = False
                 st.rerun()
 
@@ -198,25 +288,20 @@ with st.container(border=True):
     if st.session_state.show_delete_form:
         with st.expander("Remove an Entry", expanded=True):
             if not df.empty:
-                # Create a unique label for each row for the dropdown
-                df["label"] = df.apply(
-                    lambda row: f"{row['date']} - {row['asset']} ({row['quantity']} @ {row['price']})",
-                    axis=1
-                )
-
+                df["label"] = df.apply(lambda row: f"{row['date']} - {row['asset']} ({row['quantity']} @ {row['price']})", axis=1)
                 to_delete = st.selectbox("Select a purchase to remove", df["label"])
 
                 if st.button("Confirm Delete", type="primary"):
-                    # Filter out the selected row and drop the helper column
                     df = df[df["label"] != to_delete]
-                    df = df.drop(columns=["label"])
-                    df.to_csv("data/investments.csv", index=False)
                     
+                    # Update Files
+                    cols_to_drop = ["total_value", "current_price", "label"]
+                    df.drop(columns=[c for c in cols_to_drop if c in df.columns]).to_csv("data/investments.csv", index=False)
+                    save_history_entry(df) 
+
                     st.success("Entry removed!")
                     st.session_state.show_delete_form = False
                     st.rerun()
-            else:
-                st.info("No entries to remove.")
 
 ## ---------------------------------------------------------------- ##
 ##               Filters for the portfolio assets                   ##
@@ -268,10 +353,44 @@ with st.container(border=True):
 ##               Table for the portfolio assets                     ##
 ## ---------------------------------------------------------------- ##
 
+# Create a copy so we don't mutate the original data unexpectedly
+df_pro = filtered_df.copy()
+
+# 1. Calculate Total Cost and Current Value
+df_pro['Total Cost'] = (df_pro['price'] * df_pro['quantity']) + df_pro['fees']
+df_pro['Current Value'] = df_pro['current_price'] * df_pro['quantity']
+
+# 2. Calculate Profit/Loss (P/L)
+df_pro['P/L $'] = df_pro['Current Value'] - df_pro['Total Cost']
+df_pro['P/L %'] = (df_pro['P/L $'] / df_pro['Total Cost']) * 100
+
+# Drop the internal helper columns you don't want to show
+display_df = df_pro.drop(columns=["total_value", "label"], errors="ignore")
+
 with st.container(border=True):
-    with st.container(border=True):
-        st.subheader(f"Holdings Details: {filter_val}")
-        # Display the filtered dataframe
-        # We drop the helper columns like 'total_value' or 'label' if they exist for a cleaner look
-        display_df = filtered_df.drop(columns=["total_value", "label"], errors="ignore")
-        st.dataframe(display_df, use_container_width=True)
+    st.subheader(f"Holdings Details: {filter_val}")
+    
+    st.dataframe(
+        display_df,
+        column_config={
+            "asset": "Asset Name",
+            "ticker": st.column_config.TextColumn("Symbol"),
+            "price": st.column_config.NumberColumn("Buy Price", format="$%.2f"),
+            "current_price": st.column_config.NumberColumn("Market Price", format="$%.2f"),
+            "quantity": st.column_config.NumberColumn("Holdings", format="%.3f"),
+            "P/L $": st.column_config.NumberColumn("Profit/Loss ($)", format="$%.2f"),
+            "P/L %": st.column_config.ProgressColumn(
+                "Performance %",
+                help="Percentage gain or loss",
+                format="%.2f%%",
+                min_value=-100,
+                max_value=100,
+            ),
+            "goal": st.column_config.SelectboxColumn(
+                "Strategy", 
+                options=["Long-term", "Speculation", "Hedge"],
+            ),
+        },
+        hide_index=True,
+        use_container_width=True
+    )

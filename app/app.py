@@ -156,7 +156,7 @@ with st.container(border=True):
     # Layout
     # ---------------------------------------------------------------- #
 
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([1, 1])
 
     with col1:
         st.title("Portfolio Overview")
@@ -186,16 +186,38 @@ with st.container(border=True):
                 metric_change = monthly_change
                 df_selected = df_monthly
 
-            st.metric(
-                label=f"Net Worth – {selected_tf}",
-                value=f"${metric_current:,.2f}",
-                delta=f"{metric_change:+.2f}%"
-            )
+            # Calculate Total Profit (Current Value - Cost Basis)
+            total_profit_amt = metric_current - metric_invested
+            
+            # Calculate ROI % (Profit / Cost Basis)
+            roi_pct = (total_profit_amt / metric_invested * 100) if metric_invested != 0 else 0
 
-            st.metric(
-                label=f"Invested – {selected_tf}",
-                value=f"${metric_invested:,.2f}"
-            )
+            st.divider() # Optional: adds a thin line between selector and metrics
+
+            # 2. Horizontal Metrics layout
+            m_col1, m_col2, m_col3 = st.columns(3)
+
+            with m_col1:
+                st.metric(
+                    label=f"Current Value",
+                    value=f"${metric_current:,.2f}",
+                    delta=f"{metric_change:+.2f}%"
+                )
+
+            with m_col2:
+                st.metric(
+                    label=f"Total Contributed",
+                    value=f"${metric_invested:,.2f}"
+                )
+
+            with m_col3:
+                # The 'delta' parameter handles the green/red coloring automatically.
+                # If total_profit_amt is negative, it shows red. If positive, green.
+                st.metric(
+                    label="Total Profit",
+                    value=f"${total_profit_amt:,.2f}",
+                    delta=f"{roi_pct:+.2f}% ROI"
+                )
 
     # ---------------------------------------------------------------- #
     # Combined chart (Invested vs Current)
@@ -207,7 +229,7 @@ with st.container(border=True):
             x=df_selected['date'],
             y=df_selected['current_portfolio_balance'],
             mode='lines+markers',
-            name="Current Value",
+            name="Current Portfolio Value",
             line=dict(color="#007BFF", width=2),
             hovertemplate="$%{y:,.2f}<extra></extra>"
         ))
@@ -216,7 +238,7 @@ with st.container(border=True):
             x=df_selected['date'],
             y=df_selected['invested_portfolio_balance'],
             mode='lines+markers',
-            name="Invested Value",
+            name="Total Capital Contributed",
             line=dict(color="#00A676", width=2, dash="dot"),
             hovertemplate="$%{y:,.2f}<extra></extra>"
         ))
@@ -251,7 +273,7 @@ with st.container(border=True):
 
 if not df.empty:
     with st.container(border=True):
-        st.subheader("Portfolio Allocation")
+        st.title("Portfolio Allocation")
 
         grouped = df.groupby("asset")["total_value"].sum().reset_index()
         grouped = grouped.sort_values("total_value", ascending=False)
