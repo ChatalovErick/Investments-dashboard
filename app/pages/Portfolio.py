@@ -101,9 +101,6 @@ def load_data():
 
 df = load_data()
 
-if df.empty:
-    st.warning("The dataset is empty. Please add some investments to see the charts.")
-    st.stop()
 
 ## ---------------------------------------------------------------- ##
 ##                Investment Drill-Down Logic                       ##
@@ -111,74 +108,79 @@ if df.empty:
 
 with st.container(border=True):
 
-    st.subheader(f"Asset's Portfolio Overview")
+    if df.empty:
+        st.subheader(f"Asset's Portfolio Overview")
+        st.warning("The dataset is empty. Please add some investments to see the charts.")
+   
+    else:  
+        st.subheader(f"Asset's Portfolio Overview")
 
-    # Initialize Shared Drill-Down State
-    if 'current_selection' not in st.session_state:
-        st.session_state.current_selection = None
-
-    graph_col1, graph_col2 = st.columns(2)
-
-    # --- COLUMN 1: BAR CHART ---
-    with graph_col1:
-        with st.container(border=True):
-            if st.session_state.current_selection is None:
-                st.subheader("Asset Balance")
-                df_type = df.groupby('asset_type')['total_value'].sum().reset_index()
-
-                fig1 = px.bar(
-                    df_type, x='asset_type', y='total_value', 
-                    color='asset_type', text_auto='.2s',
-                    labels={'asset_type': 'Category', 'total_value': 'Value ($)'},
-                    color_discrete_sequence=px.colors.qualitative.Pastel
-                )
-                
-                selected_bar = plotly_events(fig1, click_event=True, key="bar_chart")
-                if selected_bar:
-                    st.session_state.current_selection = selected_bar[0]['x']
-                    st.rerun()
-            else:
-                sel_type = st.session_state.current_selection
-                st.markdown(f"📂 **Bar Detail**: {sel_type}")
-                
-                df_filtered = df[df['asset_type'] == sel_type].groupby('asset')['total_value'].sum().reset_index()
-                fig2 = px.bar(df_filtered, x='asset', y='total_value', color='asset', text_auto='.2s')
-                st.plotly_chart(fig2, use_container_width=True)
-
-    # --- COLUMN 2: PIE CHART ---
-    with graph_col2:
-        with st.container(border=True):
-            if st.session_state.current_selection is None:
-                st.subheader("Allocation")
-                df_type_pie = df.groupby('asset_type')['total_value'].sum().reset_index()
-
-                fig_pie = px.pie(
-                    df_type_pie, values='total_value', names='asset_type',
-                    hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel
-                )
-                fig_pie.update_traces(textinfo='percent+label')
-
-                selected_pie = plotly_events(fig_pie, click_event=True, key="pie_chart")
-                if selected_pie:
-                    idx = selected_pie[0]['pointNumber']
-                    st.session_state.current_selection = df_type_pie.iloc[idx]['asset_type']
-                    st.rerun()
-            else:
-                sel_type = st.session_state.current_selection
-                st.markdown(f"📂 **Pie Detail**: {sel_type}")
-
-                df_filtered_p = df[df['asset_type'] == sel_type].groupby('asset')['total_value'].sum().reset_index()
-                fig_pie2 = px.pie(df_filtered_p, values='total_value', names='asset', hole=0.4)
-                fig_pie2.update_traces(textinfo='percent+label')
-                st.plotly_chart(fig_pie2, use_container_width=True)
-
-    # --- NEW: SINGLE RESET BUTTON ---
-    # This button appears only when a selection is made
-    if st.session_state.current_selection is not None:
-        if st.button("⬅️ Back to All Asset Types (Reset All Graphs)", use_container_width=True):
+        # Initialize Shared Drill-Down State
+        if 'current_selection' not in st.session_state:
             st.session_state.current_selection = None
-            st.rerun()
-        st.divider() # Visual separation
+
+        graph_col1, graph_col2 = st.columns(2)
+
+        # --- COLUMN 1: BAR CHART ---
+        with graph_col1:
+            with st.container(border=True):
+                if st.session_state.current_selection is None:
+                    st.subheader("Asset Balance")
+                    df_type = df.groupby('asset_type')['total_value'].sum().reset_index()
+
+                    fig1 = px.bar(
+                        df_type, x='asset_type', y='total_value', 
+                        color='asset_type', text_auto='.2s',
+                        labels={'asset_type': 'Category', 'total_value': 'Value ($)'},
+                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    
+                    selected_bar = plotly_events(fig1, click_event=True, key="bar_chart")
+                    if selected_bar:
+                        st.session_state.current_selection = selected_bar[0]['x']
+                        st.rerun()
+                else:
+                    sel_type = st.session_state.current_selection
+                    st.markdown(f"📂 **Bar Detail**: {sel_type}")
+                    
+                    df_filtered = df[df['asset_type'] == sel_type].groupby('asset')['total_value'].sum().reset_index()
+                    fig2 = px.bar(df_filtered, x='asset', y='total_value', color='asset', text_auto='.2s')
+                    st.plotly_chart(fig2, use_container_width=True)
+
+        # --- COLUMN 2: PIE CHART ---
+        with graph_col2:
+            with st.container(border=True):
+                if st.session_state.current_selection is None:
+                    st.subheader("Allocation")
+                    df_type_pie = df.groupby('asset_type')['total_value'].sum().reset_index()
+
+                    fig_pie = px.pie(
+                        df_type_pie, values='total_value', names='asset_type',
+                        hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    fig_pie.update_traces(textinfo='percent+label')
+
+                    selected_pie = plotly_events(fig_pie, click_event=True, key="pie_chart")
+                    if selected_pie:
+                        idx = selected_pie[0]['pointNumber']
+                        st.session_state.current_selection = df_type_pie.iloc[idx]['asset_type']
+                        st.rerun()
+                else:
+                    sel_type = st.session_state.current_selection
+                    st.markdown(f"📂 **Pie Detail**: {sel_type}")
+
+                    df_filtered_p = df[df['asset_type'] == sel_type].groupby('asset')['total_value'].sum().reset_index()
+                    fig_pie2 = px.pie(df_filtered_p, values='total_value', names='asset', hole=0.4)
+                    fig_pie2.update_traces(textinfo='percent+label')
+                    st.plotly_chart(fig_pie2, use_container_width=True)
+
+        # --- NEW: SINGLE RESET BUTTON ---
+        # This button appears only when a selection is made
+        if st.session_state.current_selection is not None:
+            if st.button("⬅️ Back to All Asset Types (Reset All Graphs)", use_container_width=True):
+                st.session_state.current_selection = None
+                st.rerun()
+            st.divider() # Visual separation
 
 ## ---------------------------------------------------------------- ##
 ##               Action Buttons for adding and                      ##
@@ -322,75 +324,87 @@ with st.container(border=True):
 ## ---------------------------------------------------------------- ##
 
 with st.container(border=True):
-    col, = st.columns(1)
 
-    with col:
-        with st.container(border=True):
-            st.subheader(f"Allocation by Individual Asset: {filter_val}")
-            
-            # CHANGE: Use filtered_df here instead of df
-            df_assets = filtered_df.groupby('asset')['total_value'].sum().reset_index()
-            
-            # Sort by value
-            df_assets = df_assets.sort_values(by='total_value', ascending=False)
+    if df.empty:
+        st.subheader(f"Allocation by Individual Asset: {filter_val}")
+        st.warning("The dataset is empty. Please add some investments to see the charts.")
 
-            fig_assets = px.bar(
-                df_assets, 
-                x='asset', 
-                y='total_value', 
-                color='asset', 
-                text_auto='.2s',
-                labels={'asset': 'Asset Name', 'total_value': 'Total Value ($)'},
-                color_discrete_sequence=px.colors.qualitative.Safe
-            )
-            
-            fig_assets.update_layout(showlegend=False)
+    else:
+        col, = st.columns(1)
 
-            # Display the chart
-            st.plotly_chart(fig_assets, use_container_width=True)
+        with col:
+            with st.container(border=True):
+                st.subheader(f"Allocation by Individual Asset: {filter_val}")
+                
+                # CHANGE: Use filtered_df here instead of df
+                df_assets = filtered_df.groupby('asset')['total_value'].sum().reset_index()
+                
+                # Sort by value
+                df_assets = df_assets.sort_values(by='total_value', ascending=False)
+
+                fig_assets = px.bar(
+                    df_assets, 
+                    x='asset', 
+                    y='total_value', 
+                    color='asset', 
+                    text_auto='.2s',
+                    labels={'asset': 'Asset Name', 'total_value': 'Total Value ($)'},
+                    color_discrete_sequence=px.colors.qualitative.Safe
+                )
+                
+                fig_assets.update_layout(showlegend=False)
+
+                # Display the chart
+                st.plotly_chart(fig_assets, use_container_width=True)
 
 ## ---------------------------------------------------------------- ##
 ##               Table for the portfolio assets                     ##
 ## ---------------------------------------------------------------- ##
 
-# Create a copy so we don't mutate the original data unexpectedly
-df_pro = filtered_df.copy()
-
-# 1. Calculate Total Cost and Current Value
-df_pro['Total Cost'] = (df_pro['price'] * df_pro['quantity']) + df_pro['fees']
-df_pro['Current Value'] = df_pro['current_price'] * df_pro['quantity']
-
-# 2. Calculate Profit/Loss (P/L)
-df_pro['P/L $'] = df_pro['Current Value'] - df_pro['Total Cost']
-df_pro['P/L %'] = (df_pro['P/L $'] / df_pro['Total Cost']) * 100
-
-# Drop the internal helper columns you don't want to show
-display_df = df_pro.drop(columns=["total_value", "label"], errors="ignore")
-
 with st.container(border=True):
-    st.subheader(f"Holdings Details: {filter_val}")
-    
-    st.dataframe(
-        display_df,
-        column_config={
-            "asset": "Asset Name",
-            "ticker": st.column_config.TextColumn("Symbol"),
-            "price": st.column_config.NumberColumn("Buy Price", format="$%.2f"),
-            "current_price": st.column_config.NumberColumn("Market Price", format="$%.2f"),
-            "quantity": st.column_config.NumberColumn("Holdings", format="%.3f"),
-            "P/L $": st.column_config.NumberColumn("Profit/Loss ($)", format="$%.2f"),
-            "P/L %": st.column_config.ProgressColumn(
-                "Performance %",
-                help="Percentage gain or loss",
-                format="%.2f%%",
-                min_value=-100,
-                max_value=100,
-            ),
-            "goal": st.column_config.SelectboxColumn(
-                "Strategy", 
-                options=["Long-term", "Speculation", "Hedge"],
-            ),
-        },
-        hide_index=True,
-        use_container_width=True
-    )
+
+    if df.empty:
+        st.subheader(f"Holdings Details: {filter_val}")
+        st.warning("The dataset is empty. Please add some investments to see the charts.")
+
+    else:
+        st.subheader(f"Holdings Details: {filter_val}")
+        
+        # Create a copy so we don't mutate the original data unexpectedly
+        df_pro = filtered_df.copy()
+
+        # 1. Calculate Total Cost and Current Value
+        df_pro['Total Cost'] = (df_pro['price'] * df_pro['quantity']) + df_pro['fees']
+        df_pro['Current Value'] = df_pro['current_price'] * df_pro['quantity']
+
+        # 2. Calculate Profit/Loss (P/L)
+        df_pro['P/L $'] = df_pro['Current Value'] - df_pro['Total Cost']
+        df_pro['P/L %'] = (df_pro['P/L $'] / df_pro['Total Cost']) * 100
+
+        # Drop the internal helper columns you don't want to show
+        display_df = df_pro.drop(columns=["total_value", "label"], errors="ignore")
+
+        st.dataframe(
+            display_df,
+            column_config={
+                "asset": "Asset Name",
+                "ticker": st.column_config.TextColumn("Symbol"),
+                "price": st.column_config.NumberColumn("Buy Price", format="$%.2f"),
+                "current_price": st.column_config.NumberColumn("Market Price", format="$%.2f"),
+                "quantity": st.column_config.NumberColumn("Holdings", format="%.3f"),
+                "P/L $": st.column_config.NumberColumn("Profit/Loss ($)", format="$%.2f"),
+                "P/L %": st.column_config.ProgressColumn(
+                    "Performance %",
+                    help="Percentage gain or loss",
+                    format="%.2f%%",
+                    min_value=-100,
+                    max_value=100,
+                ),
+                "goal": st.column_config.SelectboxColumn(
+                    "Strategy", 
+                    options=["Long-term", "Speculation", "Hedge"],
+                ),
+            },
+            hide_index=True,
+            use_container_width=True
+        )
